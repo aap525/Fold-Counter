@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand -->
+    <color name="brand_primary">#8285FF</color>
+    <color name="brand_primary_dark">#5B5FEF</color>
+    <color name="brand_accent">#2FE3C8</color>
+
+    <!-- App surfaces (dark) -->
+    <color name="surface_background">#131318</color>
+    <color name="surface_card">#1E1E26</color>
+    <color name="text_primary">#F2F2F7</color>
+    <color name="text_secondary">#A0A0AC</color>
+    <color name="divider">#2C2C36</color>
+
+    <!-- Widget (dark mode) -->
+    <color name="widget_background">#1E1E26</color>
+    <color name="widget_text_primary">#F2F2F7</color>
+    <color name="widget_text_secondary">#A0A0AC</color>
+    <color name="widget_divider">#33333F</color>
+
+    <!-- Status -->
+    <color name="success_green">#3FD98A</color>
+    <color name="warning_amber">#FFB84D</color>
+</resources>

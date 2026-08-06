@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Fold Tracker</string>
+    <string name="settings">Settings</string>
+
+    <!-- Main screen -->
+    <string name="stat_today">Today</string>
+    <string name="stat_total">All time</string>
+    <string name="stat_average">Daily average</string>
+    <string name="stat_streak">Current streak</string>
+    <string name="last_7_days">Last 7 days</string>
+    <string name="daily_goal_progress">%1$d / %2$d today</string>
+    <string name="streak_days">%d day streak</string>
+    <string name="best_day">Best day: %d</string>
+    <string name="tracked_days">%d days tracked</string>
+    <string name="permission_needed_title">Background tracking needs one more step</string>
+    <string name="permission_needed_body">To keep counting unfolds while the app is closed, allow Fold Tracker to run without battery restrictions.</string>
+    <string name="allow_background">Allow</string>
+    <string name="tracking_paused">Tracking is paused</string>
+    <string name="resume_tracking">Resume</string>
+
+    <!-- Settings -->
+    <string name="setting_tracking_enabled">Track unfolds</string>
+    <string name="setting_tracking_enabled_desc">Turn off to pause counting entirely</string>
+    <string name="setting_streaks_enabled">Show streaks</string>
+    <string name="setting_streaks_enabled_desc">Track consecutive days you\'ve used your fold</string>
+    <string name="setting_goal_enabled">Daily goal</string>
+    <string name="setting_goal_enabled_desc">Show progress toward a daily unfold target</string>
+    <string name="setting_notifications_enabled">Daily summary notification</string>
+    <string name="setting_notifications_enabled_desc">Get a summary each evening at 9 PM</string>
+    <string name="setting_battery_optimization">Disable battery optimization</string>
+    <string name="setting_battery_optimization_desc">Recommended so background tracking isn\'t killed by the system</string>
+    <string name="setting_reset_data">Reset all data</string>
+    <string name="setting_reset_data_desc">Permanently delete all recorded unfolds</string>
+    <string name="reset_confirm_title">Reset all data?</string>
+    <string name="reset_confirm_body">This will permanently delete every recorded unfold and cannot be undone.</string>
+    <string name="cancel">Cancel</string>
+    <string name="reset">Reset</string>
+
+    <!-- Service / notifications -->
+    <string name="service_notification_title">Fold Tracker is watching</string>
+    <string name="service_notification_text">%d unfolds today</string>
+    <string name="daily_summary_title">Today\'s fold summary</string>
+    <string name="daily_summary_text">You unfolded your phone %1$d times today · %2$d day streak</string>
+
+    <!-- Widgets -->
+    <string name="widget_label_today">TODAY</string>
+    <string name="widget_label_total">TOTAL</string>
+    <string name="widget_daily_description">Shows today\'s unfold count</string>
+    <string name="widget_total_description">Shows your all-time unfold count</string>
+    <string name="widget_combined_description">Shows today\'s and all-time unfold counts together</string>
+</resources>
