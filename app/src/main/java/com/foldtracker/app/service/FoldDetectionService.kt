@@ -4,8 +4,12 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
+import android.view.Display
+import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
@@ -24,9 +28,13 @@ import kotlinx.coroutines.launch
 /**
  * Foreground service that observes the device's folding state using the Jetpack
  * WindowManager library (androidx.window). This is the officially supported way
- * to read fold/unfold posture changes on foldable devices such as the Galaxy Z Fold,
- * and it works regardless of which app is currently in the foreground because we
- * register against this service's own window context while it's kept alive.
+ * to read fold/unfold posture changes on foldable devices such as the Galaxy Z Fold.
+ *
+ * IMPORTANT: androidx.window's WindowInfoTracker requires a UI Context (something
+ * associated with a window/display), not a plain Context like a bare Service has.
+ * We create a lightweight "window context" (TYPE_APPLICATION) tied to the default
+ * display, which satisfies this requirement without needing any special overlay
+ * permission and without showing any actual window on screen.
  *
  * Every transition from CLOSED (folded) -> not-CLOSED (unfolded/flat/half-open) is
  * counted as one "unfold" event, debounced to avoid double counting rapid hinge jitter.
@@ -51,11 +59,44 @@ class FoldDetectionService : LifecycleService() {
     }
 
     private fun observeFoldingState() {
-        val tracker = WindowInfoTracker.getOrCreate(this)
+        val uiContext = createUiContext()
+        if (uiContext == null) {
+            // Device/OS combination can't give us a UI context to observe fold state from
+            // a background service. Fail quietly rather than crashing the app.
+            Log.w(TAG, "No UI context available; fold detection disabled on this device.")
+            return
+        }
+
+        val tracker = WindowInfoTracker.getOrCreate(uiContext)
         lifecycleScope.launch {
-            tracker.windowLayoutInfo(this@FoldDetectionService).collectLatest { info: WindowLayoutInfo ->
-                handleLayoutInfo(info)
+            try {
+                tracker.windowLayoutInfo(uiContext).collectLatest { info: WindowLayoutInfo ->
+                    handleLayoutInfo(info)
+                }
+            } catch (e: Exception) {
+                // Defensive: never let a failure here take down the whole app process.
+                Log.e(TAG, "Fold state observation failed", e)
             }
+        }
+    }
+
+    /**
+     * Creates a minimal, invisible window context so WindowInfoTracker will accept
+     * this service as an observer. Requires API 30+ (Android 11); on older versions
+     * we simply can't observe fold state from the background this way.
+     */
+    private fun createUiContext(): Context? {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+                val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
+                createWindowContext(display, WindowManager.LayoutParams.TYPE_APPLICATION, null)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create UI context", e)
+            null
         }
     }
 
@@ -81,9 +122,13 @@ class FoldDetectionService : LifecycleService() {
         if (!wasOpen && isOpen && !debounced && prefs.trackingEnabled) {
             lastEventTime = now
             lifecycleScope.launch {
-                repo.recordUnfold(now)
-                WidgetUpdater.updateAllWidgets(applicationContext)
-                updateNotification()
+                try {
+                    repo.recordUnfold(now)
+                    WidgetUpdater.updateAllWidgets(applicationContext)
+                    updateNotification()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to record unfold event", e)
+                }
             }
         }
     }
@@ -117,15 +162,20 @@ class FoldDetectionService : LifecycleService() {
     }
 
     companion object {
+        private const val TAG = "FoldDetectionService"
         private const val NOTIFICATION_ID = 1001
         private const val DEBOUNCE_MS = 800L
 
         fun start(context: Context) {
-            val intent = Intent(context, FoldDetectionService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                val intent = Intent(context, FoldDetectionService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start service", e)
             }
         }
 
