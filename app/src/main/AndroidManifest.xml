@@ -96,6 +96,42 @@
                 android:resource="@xml/combined_widget_info" />
         </receiver>
 
+        <!-- Widget: Daily bar chart -->
+        <receiver
+            android:name=".widget.DailyChartWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/daily_chart_widget_info" />
+        </receiver>
+
+        <!-- Widget: Weekly bar chart -->
+        <receiver
+            android:name=".widget.WeeklyChartWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/weekly_chart_widget_info" />
+        </receiver>
+
+        <!-- Widget: Combined daily + weekly bar charts -->
+        <receiver
+            android:name=".widget.CombinedChartWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/combined_chart_widget_info" />
+        </receiver>
+
     </application>
 
 </manifest>

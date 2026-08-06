@@ -11,7 +11,7 @@ data class DayCount(val dayKey: String, val count: Int)
 interface UnfoldDao {
 
     @Insert
-    suspend fun insert(event: UnfoldEvent)
+    suspend fun insert(event: UnfoldEvent): Long
 
     @Query("SELECT COUNT(*) FROM unfold_events")
     suspend fun getTotalCount(): Int
@@ -39,6 +39,15 @@ interface UnfoldDao {
 
     @Query("SELECT COUNT(DISTINCT dayKey) FROM unfold_events")
     suspend fun getDistinctDayCount(): Int
+
+    @Query("SELECT * FROM unfold_events WHERE closeTimestamp IS NULL ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLatestOpenSession(): UnfoldEvent?
+
+    @Query("UPDATE unfold_events SET closeTimestamp = :closeTimestamp, durationMillis = :durationMillis WHERE id = :id")
+    suspend fun closeSession(id: Long, closeTimestamp: Long, durationMillis: Long)
+
+    @Query("SELECT * FROM unfold_events ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentEvents(limit: Int): List<UnfoldEvent>
 
     @Query("DELETE FROM unfold_events")
     suspend fun clearAll(): Int

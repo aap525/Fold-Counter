@@ -2,55 +2,62 @@ package com.foldtracker.app.service
 
 import android.app.Notification
 import android.app.PendingIntent
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
-import android.hardware.display.DisplayManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import android.view.Display
-import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
-import androidx.window.layout.FoldingFeature
-import androidx.window.layout.WindowInfoTracker
-import androidx.window.layout.WindowLayoutInfo
 import com.foldtracker.app.FoldTrackerApp
 import com.foldtracker.app.MainActivity
 import com.foldtracker.app.R
 import com.foldtracker.app.data.Prefs
 import com.foldtracker.app.data.StatsRepository
 import com.foldtracker.app.widget.WidgetUpdater
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
- * Foreground service that observes the device's folding state using the Jetpack
- * WindowManager library (androidx.window). This is the officially supported way
- * to read fold/unfold posture changes on foldable devices such as the Galaxy Z Fold.
+ * Foreground service that detects fold/unfold using Android's core Configuration API,
+ * specifically `smallestScreenWidthDp`. This value is the smaller of the device's two
+ * screen dimensions and, by definition, does NOT change on simple rotation (it's always
+ * the smaller side regardless of which way the phone is held) but DOES change sharply
+ * when a foldable's screen area changes, i.e. when it's folded or unfolded.
  *
- * IMPORTANT: androidx.window's WindowInfoTracker requires a UI Context (something
- * associated with a window/display), not a plain Context like a bare Service has.
- * We create a lightweight "window context" (TYPE_APPLICATION) tied to the default
- * display, which satisfies this requirement without needing any special overlay
- * permission and without showing any actual window on screen.
+ * This deliberately avoids the Jetpack WindowManager library's FoldingFeature/WindowInfoTracker
+ * API, which relies on a vendor-provided "extension" library on the device accessed via
+ * reflection. On some Samsung firmware builds that binding can throw uncaught Errors (not
+ * just Exceptions), which will crash the whole app if unguarded. Configuration monitoring
+ * uses only long-stable, first-party Android APIs (Context.registerComponentCallbacks,
+ * available since API 14) and needs no special window context, so it works reliably from
+ * a plain background service.
  *
- * Every transition from CLOSED (folded) -> not-CLOSED (unfolded/flat/half-open) is
- * counted as one "unfold" event, debounced to avoid double counting rapid hinge jitter.
+ * Every meaningful jump in smallestScreenWidthDp is treated as a fold state transition:
+ * a big increase = unfolded (open), a big drop = folded (closed).
  */
-class FoldDetectionService : LifecycleService() {
+class FoldDetectionService : LifecycleService(), ComponentCallbacks2 {
 
     private lateinit var repo: StatsRepository
     private lateinit var prefs: Prefs
     private var lastEventTime = 0L
+    private var lastSmallestWidthDp = 0
 
     override fun onCreate() {
         super.onCreate()
-        repo = StatsRepository(applicationContext)
-        prefs = Prefs(applicationContext)
-        startForeground(NOTIFICATION_ID, buildNotification())
-        observeFoldingState()
+        try {
+            repo = StatsRepository(applicationContext)
+            prefs = Prefs(applicationContext)
+            // Baseline reflects whatever physical fold state we're already in, so a
+            // service restart never causes a spurious count.
+            lastSmallestWidthDp = resources.configuration.smallestScreenWidthDp
+            registerComponentCallbacks(this)
+            startForeground(NOTIFICATION_ID, buildNotification())
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to initialize FoldDetectionService", t)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -58,76 +65,62 @@ class FoldDetectionService : LifecycleService() {
         return START_STICKY
     }
 
-    private fun observeFoldingState() {
-        val uiContext = createUiContext()
-        if (uiContext == null) {
-            // Device/OS combination can't give us a UI context to observe fold state from
-            // a background service. Fail quietly rather than crashing the app.
-            Log.w(TAG, "No UI context available; fold detection disabled on this device.")
-            return
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        try {
+            handleConfigurationChange(newConfig)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Error handling configuration change", t)
         }
+    }
 
-        val tracker = WindowInfoTracker.getOrCreate(uiContext)
-        lifecycleScope.launch {
-            try {
-                tracker.windowLayoutInfo(uiContext).collectLatest { info: WindowLayoutInfo ->
-                    handleLayoutInfo(info)
-                }
-            } catch (e: Exception) {
-                // Defensive: never let a failure here take down the whole app process.
-                Log.e(TAG, "Fold state observation failed", e)
+    override fun onLowMemory() { /* no-op, required by ComponentCallbacks2 */ }
+
+    override fun onTrimMemory(level: Int) { /* no-op, required by ComponentCallbacks2 */ }
+
+    private fun handleConfigurationChange(newConfig: Configuration) {
+        val newWidth = newConfig.smallestScreenWidthDp
+        val delta = newWidth - lastSmallestWidthDp
+
+        when {
+            delta > FOLD_THRESHOLD_DP -> {
+                lastSmallestWidthDp = newWidth
+                onFoldTransition(isOpen = true)
+            }
+            delta < -FOLD_THRESHOLD_DP -> {
+                lastSmallestWidthDp = newWidth
+                onFoldTransition(isOpen = false)
+            }
+            else -> {
+                // Small change (rotation doesn't move this value at all; minor changes
+                // here are usually multi-window/display-density noise) - just re-baseline.
+                lastSmallestWidthDp = newWidth
             }
         }
     }
 
-    /**
-     * Creates a minimal, invisible window context so WindowInfoTracker will accept
-     * this service as an observer. Requires API 30+ (Android 11); on older versions
-     * we simply can't observe fold state from the background this way.
-     */
-    private fun createUiContext(): Context? {
-        return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                val displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-                val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
-                createWindowContext(display, WindowManager.LayoutParams.TYPE_APPLICATION, null)
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to create UI context", e)
-            null
-        }
-    }
-
-    private fun handleLayoutInfo(info: WindowLayoutInfo) {
-        val foldingFeature = info.displayFeatures
-            .filterIsInstance<FoldingFeature>()
-            .firstOrNull()
-
-        // If there's no folding feature reported, we can't determine state; ignore.
-        val isOpen = when {
-            foldingFeature == null -> return
-            foldingFeature.state == FoldingFeature.State.FLAT -> true
-            foldingFeature.state == FoldingFeature.State.HALF_OPENED -> true
-            else -> false // FoldingFeature.State can also represent CLOSED via occlusion type below
-        }
-
-        val wasOpen = prefs.lastFoldStateOpen
-        prefs.lastFoldStateOpen = isOpen
+    private fun onFoldTransition(isOpen: Boolean) {
+        if (!::prefs.isInitialized || !prefs.trackingEnabled) return
 
         val now = System.currentTimeMillis()
-        val debounced = now - lastEventTime < DEBOUNCE_MS
+        if (now - lastEventTime < DEBOUNCE_MS) return
+        lastEventTime = now
 
-        if (!wasOpen && isOpen && !debounced && prefs.trackingEnabled) {
-            lastEventTime = now
+        if (isOpen) {
             lifecycleScope.launch {
                 try {
                     repo.recordUnfold(now)
                     WidgetUpdater.updateAllWidgets(applicationContext)
                     updateNotification()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to record unfold event", e)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to record unfold event", t)
+                }
+            }
+        } else {
+            lifecycleScope.launch {
+                try {
+                    repo.recordFold(now)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to record fold-close event", t)
                 }
             }
         }
@@ -139,7 +132,7 @@ class FoldDetectionService : LifecycleService() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val today = prefs.cachedTodayCount
+        val today = if (::prefs.isInitialized) prefs.cachedTodayCount else 0
         return NotificationCompat.Builder(this, FoldTrackerApp.CHANNEL_SERVICE)
             .setContentTitle(getString(R.string.service_notification_title))
             .setContentText(getString(R.string.service_notification_text, today))
@@ -152,8 +145,21 @@ class FoldDetectionService : LifecycleService() {
     }
 
     private fun updateNotification() {
-        val manager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
-        manager.notify(NOTIFICATION_ID, buildNotification())
+        try {
+            val manager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+            manager.notify(NOTIFICATION_ID, buildNotification())
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to update notification", t)
+        }
+    }
+
+    override fun onDestroy() {
+        try {
+            unregisterComponentCallbacks(this)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to unregister callbacks", t)
+        }
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent): IBinder? {
@@ -166,6 +172,10 @@ class FoldDetectionService : LifecycleService() {
         private const val NOTIFICATION_ID = 1001
         private const val DEBOUNCE_MS = 800L
 
+        /** Minimum jump in smallestScreenWidthDp to count as a real fold transition,
+         *  not rotation (which never moves this value) or minor display noise. */
+        private const val FOLD_THRESHOLD_DP = 150
+
         fun start(context: Context) {
             try {
                 val intent = Intent(context, FoldDetectionService::class.java)
@@ -174,13 +184,17 @@ class FoldDetectionService : LifecycleService() {
                 } else {
                     context.startService(intent)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to start service", e)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to start service", t)
             }
         }
 
         fun stop(context: Context) {
-            context.stopService(Intent(context, FoldDetectionService::class.java))
+            try {
+                context.stopService(Intent(context, FoldDetectionService::class.java))
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to stop service", t)
+            }
         }
     }
 }

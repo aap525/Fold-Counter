@@ -11,6 +11,9 @@ object WidgetUpdater {
         updateWidget(context, DailyWidgetProvider::class.java)
         updateWidget(context, TotalWidgetProvider::class.java)
         updateWidget(context, CombinedWidgetProvider::class.java)
+        updateWidget(context, DailyChartWidgetProvider::class.java)
+        updateWidget(context, WeeklyChartWidgetProvider::class.java)
+        updateWidget(context, CombinedChartWidgetProvider::class.java)
     }
 
     private fun updateWidget(context: Context, provider: Class<*>) {

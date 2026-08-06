@@ -12,6 +12,8 @@ data class StatsSnapshot(
     val trackedDays: Int
 )
 
+data class WeekCount(val weekStartKey: String, val count: Int)
+
 class StatsRepository(context: Context) {
     private val dao = AppDatabase.getInstance(context).unfoldDao()
     private val prefs = Prefs(context)
@@ -20,6 +22,13 @@ class StatsRepository(context: Context) {
         val dayKey = DateUtils.dayKeyFor(timestamp)
         dao.insert(UnfoldEvent(timestamp = timestamp, dayKey = dayKey))
         refreshCache()
+    }
+
+    /** Call when the phone is folded closed, to close out the current open session with a duration. */
+    suspend fun recordFold(timestamp: Long = System.currentTimeMillis()) {
+        val openSession = dao.getLatestOpenSession() ?: return
+        val duration = (timestamp - openSession.timestamp).coerceAtLeast(0)
+        dao.closeSession(openSession.id, timestamp, duration)
     }
 
     /** Recomputes and stores the fast-access cache widgets read from. */
@@ -46,7 +55,6 @@ class StatsRepository(context: Context) {
         val todayKey = DateUtils.todayKey()
         val today = dao.getCountForDay(todayKey)
         val total = dao.getTotalCount()
-        val firstDayKey = dao.getFirstDayKey()
         val distinctDays = dao.getDistinctDayCount().coerceAtLeast(1)
         val average = if (distinctDays > 0) total.toDouble() / distinctDays else 0.0
 
@@ -69,6 +77,45 @@ class StatsRepository(context: Context) {
             bestDayCount = bestDay,
             trackedDays = distinctDays
         )
+    }
+
+    /** Daily counts for the last [days] days, oldest -> newest, zero-filled for gaps. */
+    suspend fun getDailyCounts(days: Int): List<DayCount> {
+        val startKey = DateUtils.dayKeyDaysAgo(days - 1)
+        val raw = dao.getDayCountsSince(startKey).associateBy { it.dayKey }
+        return (days - 1 downTo 0).map { offset ->
+            val key = DateUtils.dayKeyDaysAgo(offset)
+            DayCount(key, raw[key]?.count ?: 0)
+        }
+    }
+
+    /** Weekly totals for the last [weeks] weeks (Monday-start), oldest -> newest. */
+    suspend fun getWeeklyCounts(weeks: Int): List<WeekCount> {
+        val startKey = DateUtils.dayKeyDaysAgo(weeks * 7)
+        val dayCounts = dao.getDayCountsSince(startKey)
+        val byWeek = LinkedHashMap<String, Int>()
+        // Pre-fill week buckets so empty weeks show as zero, not missing.
+        for (i in (weeks - 1) downTo 0) {
+            val anchorDay = DateUtils.dayKeyDaysAgo(i * 7)
+            val weekKey = DateUtils.weekStartKeyFor(anchorDay)
+            byWeek.putIfAbsent(weekKey, 0)
+        }
+        dayCounts.forEach { dc ->
+            val weekKey = DateUtils.weekStartKeyFor(dc.dayKey)
+            byWeek[weekKey] = (byWeek[weekKey] ?: 0) + dc.count
+        }
+        return byWeek.entries.sortedBy { it.key }.map { WeekCount(it.key, it.value) }
+    }
+
+    /** Total unfolds so far in the current (Monday-start) week. */
+    suspend fun getCurrentWeekTotal(): Int {
+        val weekStart = DateUtils.weekStartKeyFor(DateUtils.todayKey())
+        return dao.getDayCountsSince(weekStart).sumOf { it.count }
+    }
+
+    /** Most recent fold sessions (with duration if closed) for the History screen. */
+    suspend fun getRecentEvents(limit: Int = 200): List<UnfoldEvent> {
+        return dao.getRecentEvents(limit)
     }
 
     suspend fun resetAllData() {
