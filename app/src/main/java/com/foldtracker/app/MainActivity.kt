@@ -1,10 +1,12 @@
 package com.foldtracker.app
 
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.fragment.app.Fragment
 import com.foldtracker.app.data.Prefs
@@ -18,6 +20,10 @@ import com.foldtracker.app.ui.HistoryFragment
  * Shell activity: hosts the top toolbar + navigation drawer, and swaps between
  * the Dashboard, History, and Charts fragments. Settings is launched as its own
  * Activity since it's a simple, self-contained screen.
+ *
+ * Toolbar/NavigationView styling (title, icon, tint, menu) is configured here in
+ * code rather than via XML "app:" attributes, deliberately - it removes any
+ * dependency on the app: namespace resolving correctly in the layout XML.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -35,20 +41,8 @@ class MainActivity : AppCompatActivity() {
 
         prefs = Prefs(this)
 
-        binding.toolbar.setNavigationOnClickListener {
-            binding.drawerLayout.openDrawer(GravityCompat.START)
-        }
-
-        binding.navView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_dashboard -> showFragment(DashboardFragment())
-                R.id.nav_history -> showFragment(HistoryFragment())
-                R.id.nav_charts -> showFragment(ChartsFragment())
-                R.id.nav_settings -> startActivity(Intent(this, SettingsActivity::class.java))
-            }
-            binding.drawerLayout.closeDrawer(GravityCompat.START)
-            true
-        }
+        setupToolbar()
+        setupNavigationDrawer()
 
         if (savedInstanceState == null) {
             binding.navView.setCheckedItem(R.id.nav_dashboard)
@@ -66,6 +60,36 @@ class MainActivity : AppCompatActivity() {
                 onBackPressedDispatcher.onBackPressed()
                 isEnabled = true
             }
+        }
+    }
+
+    private fun setupToolbar() {
+        binding.toolbar.title = getString(R.string.app_name)
+        binding.toolbar.setTitleTextColor(ContextCompat.getColor(this, R.color.text_primary))
+
+        val navIcon = ContextCompat.getDrawable(this, R.drawable.ic_menu_hamburger)?.mutate()
+        navIcon?.setTint(ContextCompat.getColor(this, R.color.text_primary))
+        binding.toolbar.navigationIcon = navIcon
+
+        binding.toolbar.setNavigationOnClickListener {
+            binding.drawerLayout.openDrawer(GravityCompat.START)
+        }
+    }
+
+    private fun setupNavigationDrawer() {
+        binding.navView.inflateMenu(R.menu.drawer_menu)
+        binding.navView.itemIconTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.text_secondary))
+        binding.navView.itemTextColor = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.text_primary))
+
+        binding.navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_dashboard -> showFragment(DashboardFragment())
+                R.id.nav_history -> showFragment(HistoryFragment())
+                R.id.nav_charts -> showFragment(ChartsFragment())
+                R.id.nav_settings -> startActivity(Intent(this, SettingsActivity::class.java))
+            }
+            binding.drawerLayout.closeDrawer(GravityCompat.START)
+            true
         }
     }
 
@@ -87,3 +111,4 @@ class MainActivity : AppCompatActivity() {
         }
     }
 }
+
