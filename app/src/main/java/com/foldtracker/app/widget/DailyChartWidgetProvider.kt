@@ -54,8 +54,8 @@ class DailyChartWidgetProvider : AppWidgetProvider() {
                 context = context,
                 values = values,
                 labels = labels,
-                widthPx = 320,
-                heightPx = 150
+                widthPx = 480,
+                heightPx = 220
             )
             views.setImageViewBitmap(R.id.widget_daily_chart_image, bitmap)
 

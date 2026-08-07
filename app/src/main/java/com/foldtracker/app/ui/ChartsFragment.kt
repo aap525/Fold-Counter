@@ -52,7 +52,7 @@ class ChartsFragment : Fragment() {
             renderBarChart(
                 chart = binding.dailyChart,
                 values = daily.map { it.count.toFloat() },
-                labels = daily.map { DateUtils.weekdayLabel(it.dayKey).take(1) },
+                labels = daily.map { DateUtils.dateLabel(it.dayKey) },
                 everyNthLabel = 5
             )
             renderBarChart(
@@ -78,7 +78,7 @@ class ChartsFragment : Fragment() {
                 granularity = everyNthLabel.toFloat()
                 setDrawGridLines(false)
                 textColor = resources.getColor(R.color.text_secondary, requireContext().theme)
-                labelRotationAngle = if (everyNthLabel == 1) -45f else 0f
+                labelRotationAngle = if (everyNthLabel == 1) -45f else -30f
             }
             axisLeft.apply {
                 axisMinimum = 0f

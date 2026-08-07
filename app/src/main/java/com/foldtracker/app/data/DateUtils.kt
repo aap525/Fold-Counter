@@ -70,6 +70,10 @@ object DateUtils {
         }
     }
 
+    /** Short calendar date label e.g. "Jul 15" for any dayKey - used for daily chart axes
+     *  where a plain weekday letter would be ambiguous (both Tue/Thu show "T", etc). */
+    fun dateLabel(dayKey: String): String = weekLabel(dayKey)
+
     fun formatDate(timestampMillis: Long): String {
         val date = Instant.ofEpochMilli(timestampMillis).atZone(zone()).toLocalDate()
         return date.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault()))

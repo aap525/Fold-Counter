@@ -61,8 +61,8 @@ class WeeklyChartWidgetProvider : AppWidgetProvider() {
                 context = context,
                 values = values,
                 labels = emptyList(),
-                widthPx = 320,
-                heightPx = 150
+                widthPx = 480,
+                heightPx = 220
             )
             views.setImageViewBitmap(R.id.widget_weekly_chart_image, bitmap)
 
