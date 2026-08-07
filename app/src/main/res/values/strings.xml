@@ -29,6 +29,8 @@
     <string name="setting_streaks_enabled_desc">Track consecutive days you\'ve used your fold</string>
     <string name="setting_goal_enabled">Daily goal</string>
     <string name="setting_goal_enabled_desc">Show progress toward a daily unfold target</string>
+    <string name="setting_goal_target">Goal target</string>
+    <string name="setting_goal_target_desc">How many unfolds counts as reaching your daily goal</string>
     <string name="setting_notifications_enabled">Daily summary notification</string>
     <string name="setting_notifications_enabled_desc">Get a summary each evening at 9 PM</string>
     <string name="setting_battery_optimization">Disable battery optimization</string>
@@ -58,6 +60,8 @@
     <string name="widget_chart_today_header">Today: %d</string>
     <string name="widget_chart_week_header">This week: %d</string>
     <string name="widget_chart_combined_header">Today %1$d · Week %2$d</string>
+    <string name="widget_caption_daily">DAILY</string>
+    <string name="widget_caption_weekly">WEEKLY</string>
 
     <!-- History -->
     <string name="history_empty">No unfolds recorded yet. Once you unfold your phone, sessions will show up here.</string>

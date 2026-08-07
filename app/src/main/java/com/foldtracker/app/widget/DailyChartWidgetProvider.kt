@@ -27,7 +27,7 @@ class DailyChartWidgetProvider : AppWidgetProvider() {
 
                 withContext(Dispatchers.Main) {
                     for (id in appWidgetIds) {
-                        updateOne(context, appWidgetManager, id, daily.map { it.count }, daily.map { DateUtils.weekdayLabel(it.dayKey).take(1) }, today)
+                        updateOne(context, appWidgetManager, id, daily.map { it.count }, daily.map { DateUtils.weekdayLabel(it.dayKey).take(2) }, today)
                     }
                 }
             } catch (t: Throwable) {

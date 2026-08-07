@@ -156,6 +156,54 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
+        <!-- Daily goal target number -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/card_background"
+            android:padding="16dp"
+            android:layout_marginBottom="10dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/setting_goal_target"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/setting_goal_target_desc"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/goal_target_input"
+                android:layout_width="64dp"
+                android:layout_height="wrap_content"
+                android:background="@drawable/edit_field_background"
+                android:padding="8dp"
+                android:gravity="center"
+                android:inputType="number"
+                android:maxLength="3"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:importantForAutofill="no" />
+        </LinearLayout>
+
         <!-- Notifications toggle -->
         <LinearLayout
             android:layout_width="match_parent"

@@ -82,8 +82,13 @@ class ChartsFragment : Fragment() {
             }
             axisLeft.apply {
                 axisMinimum = 0f
+                granularity = 1f
+                isGranularityEnabled = true
                 setDrawGridLines(true)
                 textColor = resources.getColor(R.color.text_secondary, requireContext().theme)
+                valueFormatter = object : com.github.mikephil.charting.formatter.ValueFormatter() {
+                    override fun getFormattedValue(value: Float): String = value.toInt().toString()
+                }
             }
             axisRight.isEnabled = false
             legend.isEnabled = false

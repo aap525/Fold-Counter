@@ -115,10 +115,15 @@ class DashboardFragment : Fragment() {
     private fun renderChart(data: List<Pair<String, Int>>) {
         if (_binding == null) return
         val entries = data.mapIndexed { index, pair -> BarEntry(index.toFloat(), pair.second.toFloat()) }
+        val integerFormatter = object : com.github.mikephil.charting.formatter.ValueFormatter() {
+            override fun getFormattedValue(value: Float): String = value.toInt().toString()
+        }
+
         val dataSet = BarDataSet(entries, "").apply {
             color = resources.getColor(R.color.brand_primary, requireContext().theme)
             setDrawValues(true)
             valueTextSize = 10f
+            valueFormatter = integerFormatter
         }
         binding.weekChart.apply {
             this.data = BarData(dataSet).apply { barWidth = 0.6f }
@@ -131,8 +136,11 @@ class DashboardFragment : Fragment() {
             }
             axisLeft.apply {
                 axisMinimum = 0f
+                granularity = 1f
+                isGranularityEnabled = true
                 setDrawGridLines(true)
                 textColor = resources.getColor(R.color.text_secondary, requireContext().theme)
+                valueFormatter = integerFormatter
             }
             axisRight.isEnabled = false
             legend.isEnabled = false

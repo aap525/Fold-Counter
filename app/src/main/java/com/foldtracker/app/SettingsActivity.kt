@@ -62,6 +62,8 @@ class SettingsActivity : AppCompatActivity() {
             prefs.dailyGoalEnabled = isChecked
         }
 
+        setupGoalTargetInput()
+
         binding.notificationsSwitch.isChecked = prefs.notificationsEnabled
         binding.notificationsSwitch.setOnCheckedChangeListener { _, isChecked ->
             prefs.notificationsEnabled = isChecked
@@ -71,6 +73,25 @@ class SettingsActivity : AppCompatActivity() {
                 DailySummaryReceiver.cancel(this)
             }
         }
+    }
+
+    private fun setupGoalTargetInput() {
+        binding.goalTargetInput.setText(prefs.dailyGoal.toString())
+        binding.goalTargetInput.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) saveGoalTarget()
+        }
+        binding.goalTargetInput.setOnEditorActionListener { _, _, _ ->
+            saveGoalTarget()
+            binding.goalTargetInput.clearFocus()
+            true
+        }
+    }
+
+    private fun saveGoalTarget() {
+        val entered = binding.goalTargetInput.text.toString().toIntOrNull()
+        val validated = (entered ?: prefs.dailyGoal).coerceIn(1, 999)
+        prefs.dailyGoal = validated
+        binding.goalTargetInput.setText(validated.toString())
     }
 
     private fun setupBatteryRow() {

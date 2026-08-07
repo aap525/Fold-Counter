@@ -1,30 +1,39 @@
 package com.foldtracker.app.data
 
-import java.text.SimpleDateFormat
-import java.util.Calendar
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
-import java.util.TimeZone
 
+/**
+ * All date/time handling for the app. Deliberately built on java.time (LocalDate,
+ * Instant, DateTimeFormatter) rather than the older SimpleDateFormat/Calendar APIs.
+ * SimpleDateFormat instances are NOT thread-safe, and this app calls into date logic
+ * concurrently from several places at once (the background service, multiple widgets
+ * updating in parallel, and the UI) - a shared SimpleDateFormat under that kind of
+ * concurrent access can silently corrupt and return the wrong date. java.time's types
+ * are immutable and safe to share across threads with no such risk.
+ */
 object DateUtils {
-    private val dayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
-        timeZone = TimeZone.getDefault()
-    }
+    private val dayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US)
 
-    fun dayKeyFor(timestampMillis: Long): String = dayFormat.format(timestampMillis)
+    private fun zone(): ZoneId = ZoneId.systemDefault()
 
-    fun todayKey(): String = dayFormat.format(System.currentTimeMillis())
+    fun dayKeyFor(timestampMillis: Long): String =
+        Instant.ofEpochMilli(timestampMillis).atZone(zone()).toLocalDate().format(dayFormatter)
 
-    fun dayKeyDaysAgo(daysAgo: Int): String {
-        val cal = Calendar.getInstance()
-        cal.add(Calendar.DAY_OF_YEAR, -daysAgo)
-        return dayFormat.format(cal.time)
-    }
+    fun todayKey(): String = LocalDate.now(zone()).format(dayFormatter)
 
-    /** Short weekday label e.g. "Mon" for a yyyy-MM-dd key, used in the 7-day chart. */
+    fun dayKeyDaysAgo(daysAgo: Int): String =
+        LocalDate.now(zone()).minusDays(daysAgo.toLong()).format(dayFormatter)
+
+    /** Short weekday label e.g. "Mon" for a yyyy-MM-dd key. */
     fun weekdayLabel(dayKey: String): String {
         return try {
-            val date = dayFormat.parse(dayKey) ?: return dayKey
-            SimpleDateFormat("EEE", Locale.getDefault()).format(date)
+            LocalDate.parse(dayKey, dayFormatter).dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
         } catch (e: Exception) {
             dayKey
         }
@@ -32,9 +41,9 @@ object DateUtils {
 
     fun daysBetween(startDayKey: String, endDayKey: String): Int {
         return try {
-            val start = dayFormat.parse(startDayKey)?.time ?: return 0
-            val end = dayFormat.parse(endDayKey)?.time ?: return 0
-            ((end - start) / (24 * 60 * 60 * 1000L)).toInt()
+            val start = LocalDate.parse(startDayKey, dayFormatter)
+            val end = LocalDate.parse(endDayKey, dayFormatter)
+            ChronoUnit.DAYS.between(start, end).toInt()
         } catch (e: Exception) {
             0
         }
@@ -43,14 +52,9 @@ object DateUtils {
     /** Returns the Monday-of-week key (yyyy-MM-dd) that the given dayKey falls into. */
     fun weekStartKeyFor(dayKey: String): String {
         return try {
-            val date = dayFormat.parse(dayKey) ?: return dayKey
-            val cal = Calendar.getInstance()
-            cal.time = date
-            cal.firstDayOfWeek = Calendar.MONDAY
-            val currentDow = cal.get(Calendar.DAY_OF_WEEK)
-            val daysSinceMonday = ((currentDow - Calendar.MONDAY) + 7) % 7
-            cal.add(Calendar.DAY_OF_YEAR, -daysSinceMonday)
-            dayFormat.format(cal.time)
+            val date = LocalDate.parse(dayKey, dayFormatter)
+            val daysSinceMonday = date.dayOfWeek.value - 1 // Monday=1..Sunday=7
+            date.minusDays(daysSinceMonday.toLong()).format(dayFormatter)
         } catch (e: Exception) {
             dayKey
         }
@@ -59,19 +63,21 @@ object DateUtils {
     /** Short display label for a week, e.g. "Jul 28" for the Monday of that week. */
     fun weekLabel(weekStartDayKey: String): String {
         return try {
-            val date = dayFormat.parse(weekStartDayKey) ?: return weekStartDayKey
-            SimpleDateFormat("MMM d", Locale.getDefault()).format(date)
+            val date = LocalDate.parse(weekStartDayKey, dayFormatter)
+            date.format(DateTimeFormatter.ofPattern("MMM d", Locale.getDefault()))
         } catch (e: Exception) {
             weekStartDayKey
         }
     }
 
     fun formatDate(timestampMillis: Long): String {
-        return SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(timestampMillis)
+        val date = Instant.ofEpochMilli(timestampMillis).atZone(zone()).toLocalDate()
+        return date.format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault()))
     }
 
     fun formatTime(timestampMillis: Long): String {
-        return SimpleDateFormat("h:mm a", Locale.getDefault()).format(timestampMillis)
+        val time = Instant.ofEpochMilli(timestampMillis).atZone(zone())
+        return time.format(DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault()))
     }
 
     /** Human-readable duration like "2h 14m" or "45s" for a duration in millis. */
