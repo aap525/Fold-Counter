@@ -66,14 +66,16 @@ class CombinedChartWidgetProvider : AppWidgetProvider() {
                 values = dailyValues,
                 labels = emptyList(),
                 widthPx = 300,
-                heightPx = 260
+                heightPx = 260,
+                showValueOnHighlight = false
             )
             val weeklyBitmap = WidgetChartRenderer.renderBarChart(
                 context = context,
                 values = weeklyValues,
                 labels = emptyList(),
                 widthPx = 300,
-                heightPx = 260
+                heightPx = 260,
+                showValueOnHighlight = false
             )
             views.setImageViewBitmap(R.id.widget_combined_daily_chart_image, dailyBitmap)
             views.setImageViewBitmap(R.id.widget_combined_weekly_chart_image, weeklyBitmap)

@@ -17,6 +17,7 @@
     <color name="widget_text_primary">#F2F2F7</color>
     <color name="widget_text_secondary">#A0A0AC</color>
     <color name="widget_divider">#33333F</color>
+    <color name="widget_bar_muted">#3A3B57</color>
 
     <!-- Status -->
     <color name="success_green">#3FD98A</color>

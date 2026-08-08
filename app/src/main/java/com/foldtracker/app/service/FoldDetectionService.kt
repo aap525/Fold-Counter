@@ -44,6 +44,7 @@ class FoldDetectionService : LifecycleService(), ComponentCallbacks2 {
     private lateinit var prefs: Prefs
     private var lastEventTime = 0L
     private var lastSmallestWidthDp = 0
+    private var lastNightMode = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -53,6 +54,7 @@ class FoldDetectionService : LifecycleService(), ComponentCallbacks2 {
             // Baseline reflects whatever physical fold state we're already in, so a
             // service restart never causes a spurious count.
             lastSmallestWidthDp = resources.configuration.smallestScreenWidthDp
+            lastNightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
             registerComponentCallbacks(this)
             startForeground(NOTIFICATION_ID, buildNotification())
         } catch (t: Throwable) {
@@ -68,6 +70,7 @@ class FoldDetectionService : LifecycleService(), ComponentCallbacks2 {
     override fun onConfigurationChanged(newConfig: Configuration) {
         try {
             handleConfigurationChange(newConfig)
+            handleNightModeChange(newConfig)
         } catch (t: Throwable) {
             Log.e(TAG, "Error handling configuration change", t)
         }
@@ -76,6 +79,24 @@ class FoldDetectionService : LifecycleService(), ComponentCallbacks2 {
     override fun onLowMemory() { /* no-op, required by ComponentCallbacks2 */ }
 
     override fun onTrimMemory(level: Int) { /* no-op, required by ComponentCallbacks2 */ }
+
+    /**
+     * Chart widgets are rendered as static bitmaps - once drawn, their pixel colors
+     * can't dynamically re-theme the way a live TextView can. If the system's
+     * light/dark setting changes without a fold event happening to trigger a redraw,
+     * force one here so widgets never sit stuck showing the wrong theme's colors.
+     */
+    private fun handleNightModeChange(newConfig: Configuration) {
+        val newNightMode = newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        if (newNightMode != lastNightMode) {
+            lastNightMode = newNightMode
+            try {
+                WidgetUpdater.updateAllWidgets(applicationContext)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to refresh widgets for theme change", t)
+            }
+        }
+    }
 
     private fun handleConfigurationChange(newConfig: Configuration) {
         val newWidth = newConfig.smallestScreenWidthDp
